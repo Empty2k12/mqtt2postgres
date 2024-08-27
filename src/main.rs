@@ -1,7 +1,7 @@
 #![feature(ascii_char)]
 
 use rumqttc::v5::mqttbytes::QoS;
-use tokio::{task};
+use tokio::task;
 
 use slugify::slugify;
 
@@ -13,14 +13,13 @@ use rumqttc::v5::Event;
 
 use bytes::Bytes;
 
-use tokio_postgres::{NoTls};
+use tokio_postgres::NoTls;
 
-use anyhow::{anyhow, Context};
 use serde_json::Value;
 use std::collections::HashMap;
 
-use serde_json::Value::Number;
 use serde_json::Value::Bool;
+use serde_json::Value::Number;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
@@ -31,13 +30,17 @@ async fn main() -> anyhow::Result<()> {
     mqttoptions.set_keep_alive(Duration::from_secs(5));
     mqttoptions.set_max_packet_size(Some(100000));
 
-    let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
-    task::spawn(async move {
-        requests(client).await;
-    });
+    let (mqtt_client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
+    mqtt_client
+        .subscribe("zigbee2mqtt/#", QoS::AtMostOnce)
+        .await
+        .unwrap();
 
-    let (client, connection) =
-    tokio_postgres::connect("postgresql://postgres:postgres@localhost:5432/mqtt2postgres", NoTls).await?;
+    let (client, connection) = tokio_postgres::connect(
+        "postgresql://postgres:postgres@localhost:5432/mqtt2postgres",
+        NoTls,
+    )
+    .await?;
 
     tokio::spawn(async move {
         if let Err(e) = connection.await {
@@ -53,9 +56,8 @@ async fn main() -> anyhow::Result<()> {
                     let topic = slugify_topic(&publish.topic);
 
                     if topic.len() >= 2 && topic[1] != "bridge" && !publish.dup {
-                        println!();
                         let table_name = topic.join("_"); // FIXME: turn back to . and make use of postgres schemata
-                        // println!("Properties = {:?}", publish.properties);
+                                                          // println!("Properties = {:?}", publish.properties);
 
                         let schema = build_schema_from_payload(&table_name, &publish.payload);
 
@@ -66,13 +68,12 @@ async fn main() -> anyhow::Result<()> {
                         match schema {
                             Ok(schema) => {
                                 // TODO: keep a copy of them schema in RAM; if it is unchanged, do not submit this query
-                                let table = client.query(&schema, &[]).await?;
-                                
+                                let _table = client.query(&schema, &[]).await?;
+
                                 let insert = build_insert_query(&table_name, &publish.payload);
-                                println!("{}", &insert.as_ref().unwrap());
-                                let insertresult = client.query(&insert.unwrap(), &[]).await?;
+                                let _insertresult = client.query(&insert.unwrap(), &[]).await?;
                             }
-                            Err(e) => println!("Error: {:?}", e)
+                            Err(e) => println!("Error: {:?}", e),
                         }
                     }
                 }
@@ -87,7 +88,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn build_schema_from_payload(table_name: &String, payload: &Bytes) -> anyhow::Result<String> {
-    let m: HashMap<String, Value> = serde_json::from_slice(&payload)?;
+    let m: HashMap<String, Value> = serde_json::from_slice(payload)?;
 
     let mut fields = Vec::with_capacity(m.len());
 
@@ -104,7 +105,7 @@ fn build_schema_from_payload(table_name: &String, payload: &Bytes) -> anyhow::Re
 }
 
 fn build_insert_query(table_name: &String, payload: &Bytes) -> anyhow::Result<String> {
-    let m: HashMap<String, Value> = serde_json::from_slice(&payload)?;
+    let m: HashMap<String, Value> = serde_json::from_slice(payload)?;
 
     let mut keys = Vec::with_capacity(m.len());
     let mut values = Vec::with_capacity(m.len());
@@ -123,9 +124,13 @@ fn build_insert_query(table_name: &String, payload: &Bytes) -> anyhow::Result<St
         }
     }
 
-    return Ok(format!("INSERT INTO {} ({}) VALUES ({});", table_name, keys.join(", "), values.join(", ")));
+    return Ok(format!(
+        "INSERT INTO {} ({}) VALUES ({});",
+        table_name,
+        keys.join(", "),
+        values.join(", ")
+    ));
 }
-
 
 fn extract_datatype(value: &Value) -> &str {
     match value {
@@ -134,7 +139,7 @@ fn extract_datatype(value: &Value) -> &str {
         serde_json::Value::String(_) => "text",
         // TODO: how to handle this properly?
         serde_json::Value::Null => "text",
-        _ => "other"
+        _ => "other",
     }
 }
 
@@ -144,11 +149,4 @@ fn slugify_topic(topic: &Bytes) -> Vec<String> {
         .split("/")
         .map(|part| slugify!(part, separator = "_"))
         .collect::<Vec<String>>()
-}
-
-async fn requests(client: AsyncClient) {
-    client
-        .subscribe("zigbee2mqtt/#", QoS::AtMostOnce)
-        .await
-        .unwrap();
 }
