@@ -1,0 +1,14 @@
+[package]
+name = "mqtt2postgres"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.86"
+bytes = "1.7.1"
+pretty_env_logger = "0.5.0"
+rumqttc = "0.24.0"
+serde_json = "1.0.127"
+slugify = "0.1.0"
+tokio = { version = "1.39.1", features = ["rt", "macros", "io-util", "net", "time"] }
+tokio-postgres = "0.7.11"
