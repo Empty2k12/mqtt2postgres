@@ -1,7 +1,8 @@
 #![feature(ascii_char)]
 
+mod vars;
+
 use rumqttc::v5::mqttbytes::QoS;
-use tokio::task;
 
 use slugify::slugify;
 
@@ -26,9 +27,11 @@ async fn main() -> anyhow::Result<()> {
     pretty_env_logger::init();
     // color_backtrace::install();
 
-    let mut mqttoptions = MqttOptions::new("test-1", "localhost", 1883);
+    let mut mqttoptions = MqttOptions::new("test-1", &vars::mqtt_broker_ip(), 1883);
     mqttoptions.set_keep_alive(Duration::from_secs(5));
     mqttoptions.set_max_packet_size(Some(100000));
+
+    println!("Connecting to MQTT broker at {}", &vars::mqtt_broker_ip());
 
     let (mqtt_client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
     mqtt_client
@@ -57,7 +60,8 @@ async fn main() -> anyhow::Result<()> {
 
                     if topic.len() >= 2 && topic[1] != "bridge" && !publish.dup {
                         let table_name = topic.join("_"); // FIXME: turn back to . and make use of postgres schemata
-                                                          // println!("Properties = {:?}", publish.properties);
+                                                          
+                        // println!("Properties = {:?}", publish.properties);
 
                         let schema = build_schema_from_payload(&table_name, &publish.payload);
 
