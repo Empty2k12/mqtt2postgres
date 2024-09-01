@@ -1,6 +1,11 @@
 #![feature(ascii_char)]
 
+mod error;
+mod query;
 mod vars;
+
+pub use error::Error;
+pub use query::{create_table::CreateTable, Query, QueryType, ValidQuery};
 
 use rumqttc::v5::mqttbytes::QoS;
 
@@ -57,26 +62,30 @@ async fn main() -> anyhow::Result<()> {
                 Event::Incoming(Packet::Publish(publish)) => {
                     let topic = slugify_topic(&publish.topic);
 
-                    if topic.len() >= 2 && topic[1] != "bridge" && topic[0] != "homeassistant" && !publish.dup {
+                    if topic.len() >= 2
+                        && topic[1] != "bridge"
+                        && topic[0] != "homeassistant"
+                        && !publish.dup
+                    {
                         let table_name = topic.join("_"); // FIXME: turn back to . and make use of postgres schemata
 
-                        let schema = build_schema_from_payload(&table_name, &publish.payload);
+                        let schema_query = CreateTable::new(&table_name, &publish.payload).build();
 
-                        // let rows = client
-                        //     .query("SELECT $1::TEXT", &[&"hello world"])
-                        //     .await?;
-
-                        match schema {
-                            Ok(schema) => {
+                        match schema_query {
+                            Ok(schema_query) => {
                                 // TODO: keep a copy of them schema in RAM; if it is unchanged, do not submit this query
-                                let _table = client.query(&schema, &[]).await?;
+                                let _table = client.query(&schema_query.get(), &[]).await?;
 
                                 let insert = build_insert_query(&table_name, &publish.payload);
                                 println!("insert: {:?}", insert);
                                 let _insertresult = client.query(&insert.unwrap(), &[]).await?;
                             }
-                            Err(e) => println!("Error: {:?}", e),
+                            Err(_) => {}
                         }
+
+                        // let rows = client
+                        //     .query("SELECT $1::TEXT", &[&"hello world"])
+                        //     .await?;
                     }
                 }
                 _ => {}
@@ -86,27 +95,6 @@ async fn main() -> anyhow::Result<()> {
                 return Ok(());
             }
         }
-    }
-}
-
-fn build_schema_from_payload(table_name: &String, payload: &Bytes) -> anyhow::Result<String> {
-    if payload.first() == Some(&b"{"[0]) && payload.last() == Some(&b"}"[0]) {
-        let m: HashMap<String, Value> = serde_json::from_slice(payload)?;
-
-        let mut fields = Vec::with_capacity(m.len());
-
-        for (k, v) in m {
-            let datatype = extract_datatype(&v);
-
-            // TODO: refactor to use Some/None and to support nested objects
-            if datatype != "other" {
-                fields.push(format!("{} {}", k, datatype));
-            }
-        }
-
-        return Ok(format!("CREATE TABLE IF NOT EXISTS {} (timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, {});", table_name, fields.join(", ")));
-    } else {
-        return Ok(format!("CREATE TABLE IF NOT EXISTS {} (timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, {} text);", table_name, table_name));
     }
 }
 
@@ -147,6 +135,14 @@ fn build_insert_query(table_name: &String, payload: &Bytes) -> anyhow::Result<St
     }
 }
 
+fn slugify_topic(topic: &Bytes) -> Vec<String> {
+    let parts = topic.escape_ascii().to_string();
+    parts
+        .split("/")
+        .map(|part| slugify!(part, separator = "_"))
+        .collect::<Vec<String>>()
+}
+
 fn extract_datatype(value: &Value) -> &str {
     match value {
         Number(_) => "numeric",
@@ -156,12 +152,4 @@ fn extract_datatype(value: &Value) -> &str {
         serde_json::Value::Null => "text",
         _ => "other",
     }
-}
-
-fn slugify_topic(topic: &Bytes) -> Vec<String> {
-    let parts = topic.escape_ascii().to_string();
-    parts
-        .split("/")
-        .map(|part| slugify!(part, separator = "_"))
-        .collect::<Vec<String>>()
 }

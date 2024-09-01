@@ -410,6 +410,7 @@ dependencies = [
  "rumqttc",
  "serde_json",
  "slugify",
+ "thiserror",
  "tokio",
  "tokio-postgres",
 ]
