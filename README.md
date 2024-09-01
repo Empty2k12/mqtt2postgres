@@ -14,17 +14,14 @@
 
 Pull requests are always welcome. For a list of past changes, see [CHANGELOG.md][__link2].
 
-
 ### Currently Supported Features
 
- - Table generation and insert based on zigbee2mqtt JSON schema
-
+ - Generate Tables based on the MQTT Topic and Data-Type of the Payload
+ - Unmarshal JSON payloads into a single table
 
 ## Quickstart
 
 You will need to fork the project and edit the code at this time. There are no configuration variables available, everything is hardcoded.
-
-This project has only been tested with a zigbee2mqtt server. It's not garantueed to work with anything else.
 
 ## License
 
