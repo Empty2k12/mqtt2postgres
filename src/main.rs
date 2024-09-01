@@ -25,7 +25,6 @@ use serde_json::Value::Number;
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
     pretty_env_logger::init();
-    // color_backtrace::install();
 
     let mut mqttoptions = MqttOptions::new("test-1", &vars::mqtt_broker_ip(), 1883);
     mqttoptions.set_keep_alive(Duration::from_secs(5));
@@ -35,7 +34,7 @@ async fn main() -> anyhow::Result<()> {
 
     let (mqtt_client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
     mqtt_client
-        .subscribe("zigbee2mqtt/#", QoS::AtMostOnce)
+        .subscribe("#", QoS::AtMostOnce) // zigbee2mqtt/#
         .await
         .unwrap();
 
@@ -60,8 +59,6 @@ async fn main() -> anyhow::Result<()> {
 
                     if topic.len() >= 2 && topic[1] != "bridge" && !publish.dup {
                         let table_name = topic.join("_"); // FIXME: turn back to . and make use of postgres schemata
-                                                          
-                        // println!("Properties = {:?}", publish.properties);
 
                         let schema = build_schema_from_payload(&table_name, &publish.payload);
 
@@ -75,6 +72,7 @@ async fn main() -> anyhow::Result<()> {
                                 let _table = client.query(&schema, &[]).await?;
 
                                 let insert = build_insert_query(&table_name, &publish.payload);
+                                println!("insert: {:?}", insert);
                                 let _insertresult = client.query(&insert.unwrap(), &[]).await?;
                             }
                             Err(e) => println!("Error: {:?}", e),
@@ -92,48 +90,61 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn build_schema_from_payload(table_name: &String, payload: &Bytes) -> anyhow::Result<String> {
-    let m: HashMap<String, Value> = serde_json::from_slice(payload)?;
+    if payload.first() == Some(&b"{"[0]) && payload.last() == Some(&b"}"[0]) {
+        let m: HashMap<String, Value> = serde_json::from_slice(payload)?;
 
-    let mut fields = Vec::with_capacity(m.len());
+        let mut fields = Vec::with_capacity(m.len());
 
-    for (k, v) in m {
-        let datatype = extract_datatype(&v);
+        for (k, v) in m {
+            let datatype = extract_datatype(&v);
 
-        // TODO: refactor to use Some/None and to support nested objects
-        if datatype != "other" {
-            fields.push(format!("{} {}", k, datatype));
+            // TODO: refactor to use Some/None and to support nested objects
+            if datatype != "other" {
+                fields.push(format!("{} {}", k, datatype));
+            }
         }
-    }
 
-    return Ok(format!("CREATE TABLE IF NOT EXISTS {} (timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, {});", table_name, fields.join(", ")));
+        return Ok(format!("CREATE TABLE IF NOT EXISTS {} (timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, {});", table_name, fields.join(", ")));
+    } else {
+        return Ok(format!("CREATE TABLE IF NOT EXISTS {} (timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, {} text);", table_name, table_name));
+    }
 }
 
 fn build_insert_query(table_name: &String, payload: &Bytes) -> anyhow::Result<String> {
-    let m: HashMap<String, Value> = serde_json::from_slice(payload)?;
+    if payload.first() == Some(&b"{"[0]) && payload.last() == Some(&b"}"[0]) {
+        let m: HashMap<String, Value> = serde_json::from_slice(payload)?;
 
-    let mut keys = Vec::with_capacity(m.len());
-    let mut values = Vec::with_capacity(m.len());
+        let mut keys = Vec::with_capacity(m.len());
+        let mut values = Vec::with_capacity(m.len());
 
-    for (k, v) in m {
-        let datatype = extract_datatype(&v);
+        for (k, v) in m {
+            let datatype = extract_datatype(&v);
 
-        // TODO: refactor to use Some/None and to support nested objects
-        if datatype != "other" {
-            keys.push(k);
-            if v.is_string() {
-                values.push(format!(r#"'{}'"#, v.as_str().unwrap()));
-            } else {
-                values.push(v.to_string());
+            // TODO: refactor to use Some/None and to support nested objects
+            if datatype != "other" {
+                keys.push(k);
+                if v.is_string() {
+                    values.push(format!(r#"'{}'"#, v.as_str().unwrap()));
+                } else {
+                    values.push(v.to_string());
+                }
             }
         }
-    }
 
-    return Ok(format!(
-        "INSERT INTO {} ({}) VALUES ({});",
-        table_name,
-        keys.join(", "),
-        values.join(", ")
-    ));
+        return Ok(format!(
+            "INSERT INTO {} ({}) VALUES ({});",
+            table_name,
+            keys.join(", "),
+            values.join(", ")
+        ));
+    } else {
+        return Ok(format!(
+            "INSERT INTO {} ({}) VALUES ('{}');",
+            table_name,
+            table_name,
+            payload.escape_ascii().to_string()
+        ));
+    }
 }
 
 fn extract_datatype(value: &Value) -> &str {
