@@ -1,4 +1,5 @@
 pub mod create_table;
+pub mod pg_datatype;
 
 use crate::Error;
 

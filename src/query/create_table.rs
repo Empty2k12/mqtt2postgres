@@ -5,9 +5,11 @@
 use std::collections::HashMap;
 
 use bytes::Bytes;
-use serde_json::Value::{self, Bool, Number};
+use serde_json::Value;
 
 use crate::{Error, IsJson, Query, QueryType, ValidQuery};
+
+use super::pg_datatype::PGDatatype;
 
 #[derive(Debug, Clone)]
 pub struct CreateTable<'a> {
@@ -32,19 +34,16 @@ impl<'a> CreateTable<'a> {
 impl<'a> Query for CreateTable<'a> {
     fn build(&self) -> Result<ValidQuery, Error> {
         if self.payload.is_json() {
-            let m: HashMap<String, Value> =
+            let entries: HashMap<String, Value> =
                 serde_json::from_slice(&self.payload).map_err(|err| Error::JSONError {
                     error: format!("{}", err),
                 })?;
 
-            let mut fields = Vec::with_capacity(m.len());
+            let mut fields = Vec::with_capacity(entries.len());
 
-            for (k, v) in m {
-                let datatype = extract_datatype(&v);
-
-                // TODO: refactor to use Some/None and to support nested objects
-                if datatype != "other" {
-                    fields.push(format!("{} {}", k, datatype));
+            for (keys, value) in entries {
+                if let Ok(datatype) = PGDatatype::try_from(value) {
+                    fields.push(format!("{} {}", keys, datatype.to_string()));
                 }
             }
 
@@ -56,16 +55,5 @@ impl<'a> Query for CreateTable<'a> {
 
     fn get_type(&self) -> QueryType {
         QueryType::CreateTable
-    }
-}
-
-fn extract_datatype(value: &Value) -> &str {
-    match value {
-        Number(_) => "numeric",
-        Bool(_) => "boolean",
-        serde_json::Value::String(_) => "text",
-        // TODO: how to handle this properly?
-        serde_json::Value::Null => "text",
-        _ => "other",
     }
 }
