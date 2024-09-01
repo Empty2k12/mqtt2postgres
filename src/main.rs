@@ -99,7 +99,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn build_insert_query(table_name: &String, payload: &Bytes) -> anyhow::Result<String> {
-    if payload.first() == Some(&b"{"[0]) && payload.last() == Some(&b"}"[0]) {
+    if payload.is_json() {
         let m: HashMap<String, Value> = serde_json::from_slice(payload)?;
 
         let mut keys = Vec::with_capacity(m.len());
@@ -151,5 +151,15 @@ fn extract_datatype(value: &Value) -> &str {
         // TODO: how to handle this properly?
         serde_json::Value::Null => "text",
         _ => "other",
+    }
+}
+
+trait IsJson {
+    fn is_json(&self) -> bool;
+}
+
+impl IsJson for Bytes {
+    fn is_json(&self) -> bool {
+        return self.first() == Some(&b"{"[0]) && self.last() == Some(&b"}"[0]);
     }
 }

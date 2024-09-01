@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use bytes::Bytes;
 use serde_json::Value::{self, Bool, Number};
 
-use crate::{Error, Query, QueryType, ValidQuery};
+use crate::{Error, IsJson, Query, QueryType, ValidQuery};
 
 #[derive(Debug, Clone)]
 pub struct CreateTable<'a> {
@@ -31,7 +31,7 @@ impl<'a> CreateTable<'a> {
 
 impl<'a> Query for CreateTable<'a> {
     fn build(&self) -> Result<ValidQuery, Error> {
-        if self.payload.first() == Some(&b"{"[0]) && self.payload.last() == Some(&b"}"[0]) {
+        if self.payload.is_json() {
             let m: HashMap<String, Value> =
                 serde_json::from_slice(&self.payload).map_err(|err| Error::JSONError {
                     error: format!("{}", err),
