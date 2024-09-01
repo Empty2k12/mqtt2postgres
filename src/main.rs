@@ -57,7 +57,7 @@ async fn main() -> anyhow::Result<()> {
                 Event::Incoming(Packet::Publish(publish)) => {
                     let topic = slugify_topic(&publish.topic);
 
-                    if topic.len() >= 2 && topic[1] != "bridge" && !publish.dup {
+                    if topic.len() >= 2 && topic[1] != "bridge" && topic[0] != "homeassistant" && !publish.dup {
                         let table_name = topic.join("_"); // FIXME: turn back to . and make use of postgres schemata
 
                         let schema = build_schema_from_payload(&table_name, &publish.payload);

@@ -13,3 +13,15 @@ services:
       interval: 1s
       timeout: 5s
       retries: 10
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - 3000:3000
+    links:
+      - db
+    env_file:
+      - ./grafana/grafana.env
+    volumes:
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+      - ./grafana/dashboards/:/var/lib/grafana/dashboards
