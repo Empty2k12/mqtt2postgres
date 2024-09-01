@@ -66,6 +66,8 @@ async fn main() -> anyhow::Result<()> {
                         && topic[1] != "bridge"
                         && topic[0] != "homeassistant"
                         && !publish.dup
+                        // TODO: create / read schema for retained messages, but don't write entries at startup
+                        && !publish.retain
                     {
                         let table_name = topic.join("_"); // FIXME: turn back to . and make use of postgres schemata
 
