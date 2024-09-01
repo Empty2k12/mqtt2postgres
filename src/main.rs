@@ -5,6 +5,7 @@ mod query;
 mod vars;
 
 pub use error::Error;
+use query::insert_record::InsertRecord;
 pub use query::{create_table::CreateTable, Query, QueryType, ValidQuery};
 
 use rumqttc::v5::mqttbytes::QoS;
@@ -20,12 +21,6 @@ use rumqttc::v5::Event;
 use bytes::Bytes;
 
 use tokio_postgres::NoTls;
-
-use serde_json::Value;
-use std::collections::HashMap;
-
-use serde_json::Value::Bool;
-use serde_json::Value::Number;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
@@ -78,9 +73,12 @@ async fn main() -> anyhow::Result<()> {
                                 // TODO: keep a copy of them schema in RAM; if it is unchanged, do not submit this query
                                 let _table = client.query(&schema_query.get(), &[]).await?;
 
-                                let insert = build_insert_query(&table_name, &publish.payload);
-                                println!("insert: {:?}", insert);
-                                let _insertresult = client.query(&insert.unwrap(), &[]).await?;
+                                if let Ok(insert_record) =
+                                    InsertRecord::new(table_name, &publish.payload).build()
+                                {
+                                    let _insertresult =
+                                        client.query(&insert_record.get(), &[]).await?;
+                                }
                             }
                             Err(_) => {}
                         }
@@ -100,60 +98,12 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-fn build_insert_query(table_name: &String, payload: &Bytes) -> anyhow::Result<String> {
-    if payload.is_json() {
-        let m: HashMap<String, Value> = serde_json::from_slice(payload)?;
-
-        let mut keys = Vec::with_capacity(m.len());
-        let mut values = Vec::with_capacity(m.len());
-
-        for (k, v) in m {
-            let datatype = extract_datatype(&v);
-
-            // TODO: refactor to use Some/None and to support nested objects
-            if datatype != "other" {
-                keys.push(k);
-                if v.is_string() {
-                    values.push(format!(r#"'{}'"#, v.as_str().unwrap()));
-                } else {
-                    values.push(v.to_string());
-                }
-            }
-        }
-
-        return Ok(format!(
-            "INSERT INTO {} ({}) VALUES ({});",
-            table_name,
-            keys.join(", "),
-            values.join(", ")
-        ));
-    } else {
-        return Ok(format!(
-            "INSERT INTO {} ({}) VALUES ('{}');",
-            table_name,
-            table_name,
-            payload.escape_ascii().to_string()
-        ));
-    }
-}
-
 fn slugify_topic(topic: &Bytes) -> Vec<String> {
     let parts = topic.escape_ascii().to_string();
     parts
         .split("/")
         .map(|part| slugify!(part, separator = "_"))
         .collect::<Vec<String>>()
-}
-
-fn extract_datatype(value: &Value) -> &str {
-    match value {
-        Number(_) => "numeric",
-        Bool(_) => "boolean",
-        serde_json::Value::String(_) => "text",
-        // TODO: how to handle this properly?
-        serde_json::Value::Null => "text",
-        _ => "other",
-    }
 }
 
 trait IsJson {

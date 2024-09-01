@@ -18,7 +18,6 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
   "links": [],
   "panels": [
     {
@@ -272,7 +271,7 @@
       "type": "timeseries"
     }
   ],
-  "refresh": "",
+  "refresh": "10s",
   "schemaVersion": 39,
   "tags": [],
   "templating": {
@@ -286,6 +285,6 @@
   "timezone": "browser",
   "title": "Dashboard",
   "uid": "bdwmien1h6k1sa",
-  "version": 3,
+  "version": 1,
   "weekStart": ""
 }

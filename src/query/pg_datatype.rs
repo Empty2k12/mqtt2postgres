@@ -1,5 +1,6 @@
-use serde_json::Value::{Number, Bool};
+use serde_json::Value::{Bool, Number};
 
+#[derive(Debug, Eq, PartialEq)]
 pub enum PGDatatype {
     Numeric,
     Boolean,
@@ -7,10 +8,10 @@ pub enum PGDatatype {
     Null,
 }
 
-impl TryFrom<serde_json::value::Value> for PGDatatype {
+impl TryFrom<&serde_json::value::Value> for PGDatatype {
     type Error = ();
 
-    fn try_from(value: serde_json::value::Value) -> Result<Self, Self::Error> {
+    fn try_from(value: &serde_json::value::Value) -> Result<Self, Self::Error> {
         match value {
             Number(_) => Ok(Self::Numeric),
             Bool(_) => Ok(Self::Boolean),

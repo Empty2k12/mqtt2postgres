@@ -1,4 +1,5 @@
 pub mod create_table;
+pub mod insert_record;
 pub mod pg_datatype;
 
 use crate::Error;
@@ -40,4 +41,5 @@ impl PartialEq<&str> for ValidQuery {
 #[derive(PartialEq, Eq, Debug)]
 pub enum QueryType {
     CreateTable,
+    InsertRecord,
 }

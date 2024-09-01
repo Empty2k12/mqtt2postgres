@@ -42,7 +42,7 @@ impl<'a> Query for CreateTable<'a> {
             let mut fields = Vec::with_capacity(entries.len());
 
             for (keys, value) in entries {
-                if let Ok(datatype) = PGDatatype::try_from(value) {
+                if let Ok(datatype) = PGDatatype::try_from(&value) {
                     fields.push(format!("{} {}", keys, datatype.to_string()));
                 }
             }
