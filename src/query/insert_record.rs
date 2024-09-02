@@ -1,6 +1,4 @@
 //! Table Insertion Query Builder
-//!
-//!
 
 use std::collections::HashMap;
 
@@ -14,7 +12,7 @@ use super::pg_datatype::PGDatatype;
 #[derive(Debug, Clone)]
 pub struct InsertRecord<'a> {
     table_name: String,
-    payload: &'a Bytes,
+    payload: &'a Bytes
 }
 
 impl<'a> InsertRecord<'a> {
@@ -22,11 +20,11 @@ impl<'a> InsertRecord<'a> {
     #[must_use = "Creating a query is pointless unless you execute it"]
     pub fn new<S1>(table_name: S1, payload: &'a Bytes) -> Self
     where
-        S1: Into<String>,
+        S1: Into<String>
     {
         InsertRecord {
             table_name: table_name.into(),
-            payload,
+            payload
         }
     }
 }
@@ -34,9 +32,9 @@ impl<'a> InsertRecord<'a> {
 impl<'a> Query for InsertRecord<'a> {
     fn build(&self) -> Result<ValidQuery, Error> {
         if self.payload.is_json() {
-            let entries: HashMap<String, Value> =
-                serde_json::from_slice(self.payload).map_err(|err| Error::JSONError {
-                    error: format!("{}", err),
+            let entries: HashMap<String, Value> = serde_json::from_slice(self.payload)
+                .map_err(|err| Error::JSONError {
+                    error: format!("{}", err)
                 })?;
 
             let mut keys = Vec::with_capacity(entries.len());

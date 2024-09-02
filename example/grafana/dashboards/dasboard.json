@@ -111,7 +111,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT timestamp, power FROM zigbee2mqtt_serverrack_schalter LIMIT 50 ",
+          "rawSql": "SELECT timestamp, power FROM zigbee2mqtt_serverrack_schalter WHERE $__timeFilter(\"timestamp\")",
           "refId": "A",
           "sql": {
             "columns": [
@@ -229,9 +229,10 @@
             "type": "grafana-postgresql-datasource",
             "uid": "pgds"
           },
-          "editorMode": "builder",
+          "editorMode": "code",
           "format": "table",
-          "rawSql": "SELECT wifi_signal, \"timestamp\" FROM awtrix_eceb30_stats LIMIT 50 ",
+          "rawQuery": true,
+          "rawSql": "SELECT wifi_signal, \"timestamp\" FROM awtrix_eceb30_stats WHERE $__timeFilter(\"timestamp\")",
           "refId": "A",
           "sql": {
             "columns": [

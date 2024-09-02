@@ -20,7 +20,7 @@ impl ValidQuery {
 }
 impl<T> From<T> for ValidQuery
 where
-    T: Into<String>,
+    T: Into<String>
 {
     fn from(string: T) -> Self {
         Self(string.into())
@@ -41,5 +41,5 @@ impl PartialEq<&str> for ValidQuery {
 #[derive(PartialEq, Eq, Debug)]
 pub enum QueryType {
     CreateTable,
-    InsertRecord,
+    InsertRecord
 }

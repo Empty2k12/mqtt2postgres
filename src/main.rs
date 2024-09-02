@@ -1,14 +1,14 @@
 #![feature(ascii_char)]
 
 mod error;
+mod helpers;
 mod query;
 mod vars;
-mod helpers;
 
 pub use error::Error;
+pub use helpers::IsJson;
 use query::insert_record::InsertRecord;
 pub use query::{create_table::CreateTable, Query, QueryType, ValidQuery};
-pub use helpers::IsJson;
 
 use rumqttc::v5::mqttbytes::QoS;
 
@@ -17,8 +17,7 @@ use slugify::slugify;
 use rumqttc::v5::{AsyncClient, MqttOptions};
 use std::time::Duration;
 
-use rumqttc::v5::mqttbytes::v5::Packet;
-use rumqttc::v5::Event;
+use rumqttc::v5::{mqttbytes::v5::Packet, Event};
 
 use bytes::Bytes;
 
@@ -50,7 +49,7 @@ async fn main() -> anyhow::Result<()> {
 
     let (client, connection) = tokio_postgres::connect(
         "postgresql://postgres:postgres@localhost:5432/mqtt2postgres",
-        NoTls,
+        NoTls
     )
     .await?;
 
@@ -64,7 +63,9 @@ async fn main() -> anyhow::Result<()> {
         let event = eventloop.poll().await;
         match &event {
             Ok(v) => match v {
-                Event::Incoming(Packet::Publish(publish)) => handle_publish(&client, publish).await?,
+                Event::Incoming(Packet::Publish(publish)) => {
+                    handle_publish(&client, publish).await?
+                },
                 _ => {}
             },
             Err(e) => {
@@ -75,11 +76,11 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-#[tracing::instrument(
-    name = "handle_publish",
-    skip(client, publish),
-)]
-async fn handle_publish(client: &Client, publish: &rumqttc::v5::mqttbytes::v5::Publish) -> anyhow::Result<()> {
+#[tracing::instrument(name = "handle_publish", skip(client, publish))]
+async fn handle_publish(
+    client: &Client,
+    publish: &rumqttc::v5::mqttbytes::v5::Publish
+) -> anyhow::Result<()> {
     let topic = slugify_topic(&publish.topic);
 
     if topic.len() >= 2
@@ -101,12 +102,11 @@ async fn handle_publish(client: &Client, publish: &rumqttc::v5::mqttbytes::v5::P
                 if let Ok(insert_record) =
                     InsertRecord::new(&table_name, &publish.payload).build()
                 {
-                    let _insertresult =
-                        client.query(&insert_record.get(), &[]).await?;
-                    
+                    let _insertresult = client.query(&insert_record.get(), &[]).await?;
+
                     info!(table_name = &table_name);
                 }
-            }
+            },
             Err(_) => {}
         }
     }

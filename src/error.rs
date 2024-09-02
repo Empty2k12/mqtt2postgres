@@ -15,5 +15,5 @@ pub enum Error {
 
     #[error("json error: {error}")]
     /// Error happens when there is a JSON error
-    JSONError { error: String },
+    JSONError { error: String }
 }

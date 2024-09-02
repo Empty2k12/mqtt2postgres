@@ -5,7 +5,7 @@ pub enum PGDatatype {
     Numeric,
     Boolean,
     Text,
-    Null,
+    Null
 }
 
 impl TryFrom<&serde_json::value::Value> for PGDatatype {
@@ -17,7 +17,7 @@ impl TryFrom<&serde_json::value::Value> for PGDatatype {
             Bool(_) => Ok(Self::Boolean),
             serde_json::Value::String(_) => Ok(Self::Text),
             serde_json::Value::Null => Ok(Self::Null),
-            _ => Err(()),
+            _ => Err(())
         }
     }
 }
@@ -28,7 +28,7 @@ impl ToString for PGDatatype {
             Self::Numeric => "numeric".into(),
             Self::Boolean => "boolean".into(),
             Self::Text => "text".into(),
-            Self::Null => "text".into(),
+            Self::Null => "text".into()
         }
     }
 }
