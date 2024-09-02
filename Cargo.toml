@@ -14,3 +14,5 @@ slugify = "0.1.0"
 thiserror = "1.0.63"
 tokio = { version = "1.39.1", features = ["rt", "macros", "io-util", "net", "time"] }
 tokio-postgres = "0.7.11"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
