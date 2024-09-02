@@ -40,7 +40,7 @@ async fn main() -> anyhow::Result<()> {
     mqttoptions.set_keep_alive(Duration::from_secs(5));
     mqttoptions.set_max_packet_size(Some(100000));
 
-    println!("Connecting to MQTT broker at {}", &vars::mqtt_broker_ip());
+    info!(broker_ip = &vars::mqtt_broker_ip(), "Connecting to MQTT");
 
     let (mqtt_client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
     mqtt_client

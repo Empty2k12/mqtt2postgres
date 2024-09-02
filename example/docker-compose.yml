@@ -1,7 +1,8 @@
 services:
-  db:
+  postgres:
     image: postgres:16.2-alpine
     restart: always
+    container_name: postgres
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -19,7 +20,7 @@ services:
     ports:
       - 3000:3000
     links:
-      - db
+      - postgres
     env_file:
       - ./grafana/grafana.env
     volumes:

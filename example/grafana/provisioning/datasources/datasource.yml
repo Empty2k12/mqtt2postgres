@@ -6,7 +6,7 @@ datasources:
   - name: Postgres
     type: postgres
     uid: pgds
-    url: db:5432
+    url: postgres:5432
     user: postgres
     secureJsonData:
       password: 'postgres'
