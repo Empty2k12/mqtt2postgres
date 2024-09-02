@@ -1,10 +1,12 @@
 #![feature(ascii_char)]
 
+mod config;
 mod error;
 mod helpers;
 mod query;
-mod vars;
 
+use anyhow::Context;
+pub use config::Config;
 pub use error::Error;
 pub use helpers::IsJson;
 use query::insert_record::InsertRecord;
@@ -15,7 +17,7 @@ use rumqttc::v5::mqttbytes::QoS;
 use slugify::slugify;
 
 use rumqttc::v5::{AsyncClient, MqttOptions};
-use std::time::Duration;
+use std::{fs, time::Duration};
 
 use rumqttc::v5::{mqttbytes::v5::Packet, Event};
 
@@ -35,20 +37,33 @@ async fn main() -> anyhow::Result<()> {
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
 
-    let mut mqttoptions = MqttOptions::new("test-1", &vars::mqtt_broker_ip(), 1883);
-    mqttoptions.set_keep_alive(Duration::from_secs(5));
-    mqttoptions.set_max_packet_size(Some(100000));
+    let config = fs::read("./config.toml")
+        .with_context(|| format!("Failed to read {:?}", "./config.toml"))
+        .unwrap_or_else(|err| panic!("{err:?}"));
+    let config: Config = toml::from_slice(&config)
+        .with_context(|| "Failed to deserialize config")
+        .unwrap_or_else(|err| panic!("{err:?}"));
 
-    info!(broker_ip = &vars::mqtt_broker_ip(), "Connecting to MQTT");
+    let mut mqttoptions = MqttOptions::new(
+        &config.mqtt.client_name,
+        &config.mqtt.broker_ip,
+        config.mqtt.broker_port
+    );
+    mqttoptions.set_keep_alive(Duration::from_secs(config.mqtt.keep_alive_seconds.into()));
+    mqttoptions.set_max_packet_size(Some(config.mqtt.max_packet_size.into()));
+
+    info!(broker_ip = &config.mqtt.broker_ip, broker_port = config.mqtt.broker_port, client_name = &config.mqtt.client_name, "Connecting to MQTT");
 
     let (mqtt_client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
-    mqtt_client
-        .subscribe("#", QoS::AtMostOnce) // zigbee2mqtt/#
-        .await
-        .unwrap();
+    for subscribe in config.topics.subscribe {
+        mqtt_client
+            .subscribe(subscribe.topic, QoS::AtMostOnce)
+            .await
+            .unwrap();
+    }
 
     let (client, connection) = tokio_postgres::connect(
-        "postgresql://postgres:postgres@localhost:5432/mqtt2postgres",
+        &config.postgres.connection_string,
         NoTls
     )
     .await?;
