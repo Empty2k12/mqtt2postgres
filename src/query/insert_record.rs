@@ -37,16 +37,17 @@ impl<'a> Query for InsertRecord<'a> {
                     error: format!("{}", err)
                 })?;
 
-            let mut keys = Vec::with_capacity(entries.len());
-            let mut values = Vec::with_capacity(entries.len());
+            let mut keys = Vec::new();
+            let mut values = Vec::new();
 
             for (key, value) in entries {
                 if let Ok(datatype) = PGDatatype::try_from(&value) {
-                    keys.push(key);
                     if datatype == PGDatatype::Text {
                         values.push(format!(r#"'{}'"#, value.as_str().unwrap()));
-                    } else {
+                        keys.push(key);
+                    } else if datatype != PGDatatype::Null {
                         values.push(value.to_string());
+                        keys.push(key);
                     }
                 }
             }

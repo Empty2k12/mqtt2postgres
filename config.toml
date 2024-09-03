@@ -1,5 +1,5 @@
 [mqtt]
-broker_ip = "127.0.0.1"
+broker_ip = "134.130.172.253"
 broker_port = 1883
 client_name = "mqtt2postgres"
 # optional

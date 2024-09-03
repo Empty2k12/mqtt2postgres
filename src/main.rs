@@ -117,7 +117,12 @@ async fn handle_publish(
                 if let Ok(insert_record) =
                     InsertRecord::new(&table_name, &publish.payload).build()
                 {
-                    let _insertresult = client.query(&insert_record.get(), &[]).await?;
+                    let query = &insert_record.get();
+                    let insert_record2 = client.query(query, &[]).await;
+
+                    if insert_record2.is_err() {
+                        println!("{:?}", query);
+                    }
 
                     info!(table_name = &table_name);
                 }
