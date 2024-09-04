@@ -16,7 +16,7 @@ pub struct InsertRecord<'a> {
 }
 
 impl<'a> InsertRecord<'a> {
-    /// Creates a new [`ReadQuery`]
+    /// Creates a new [`InsertRecord`]
     #[must_use = "Creating a query is pointless unless you execute it"]
     pub fn new<S1>(table_name: S1, payload: &'a Bytes) -> Self
     where

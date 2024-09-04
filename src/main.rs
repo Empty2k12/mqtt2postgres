@@ -114,7 +114,7 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-#[tracing::instrument(name = "handle_publish", skip(client, publish, known_schemata))]
+#[tracing::instrument(name = "handle_publish", skip_all)]
 async fn handle_publish(
     client: &mut Client,
     publish: &rumqttc::v5::mqttbytes::v5::Publish,
@@ -149,7 +149,6 @@ async fn handle_publish(
                 )
                 .await?;
             } else {
-                // Update our known schemata with the schema from Postgres and then run the table creation logic
                 let mut new_schema = HashSet::new();
                 for row in rows {
                     let value_name: String = row.get("column_name");
@@ -157,14 +156,6 @@ async fn handle_publish(
                     new_schema.insert((value_name, data_type));
                 }
                 known_schemata.insert(table_name.clone(), new_schema);
-                create_table(
-                    client,
-                    publish,
-                    &table_name,
-                    known_schemata,
-                    timescale_enabled
-                )
-                .await?;
             }
         }
         insert_row(client, publish, &table_name, known_schemata).await?;
@@ -173,7 +164,7 @@ async fn handle_publish(
     Ok(())
 }
 
-#[tracing::instrument(name = "create_table", skip(client, publish, known_schemata))]
+#[tracing::instrument(name = "create_table", skip_all)]
 async fn create_table(
     client: &mut Client,
     publish: &rumqttc::v5::mqttbytes::v5::Publish,
@@ -186,8 +177,6 @@ async fn create_table(
     let schema_query = CreateTable::new(table_name, &publish.payload, create_hypertable)
         .build(known_schemata)?;
 
-    // TODO: keep a copy of the schema in RAM; if it is unchanged, do not submit this query
-
     let transaction = client.transaction().await?;
     for query in schema_query {
         transaction.query(&query.get(), &[]).await?;
@@ -197,7 +186,7 @@ async fn create_table(
     return Ok(());
 }
 
-#[tracing::instrument(name = "insert_row", skip(client, publish, known_schemata))]
+#[tracing::instrument(name = "insert_row", skip_all)]
 async fn insert_row(
     client: &mut Client,
     publish: &rumqttc::v5::mqttbytes::v5::Publish,

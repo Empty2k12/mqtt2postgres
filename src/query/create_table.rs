@@ -17,7 +17,7 @@ pub struct CreateTable<'a> {
 }
 
 impl<'a> CreateTable<'a> {
-    /// Creates a new [`ReadQuery`]
+    /// Creates a new [`CreateTable`]
     #[must_use = "Creating a query is pointless unless you execute it"]
     pub fn new<S1>(table_name: S1, payload: &'a Bytes, init_hypertable: bool) -> Self
     where
