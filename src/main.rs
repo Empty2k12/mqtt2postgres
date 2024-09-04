@@ -121,9 +121,6 @@ async fn handle_publish(
 ) -> anyhow::Result<()> {
     let topic = slugify_topic(&publish.topic);
 
-    let payload_str = publish.payload.escape_ascii().to_string();
-    debug!(topic = topic.join("-"));
-
     if topic.len() >= 2
         // TODO: use config provided ignores
         && topic[1] != "bridge"
@@ -147,16 +144,11 @@ async fn create_table(client: &mut Client, publish: &rumqttc::v5::mqttbytes::v5:
 
     // TODO: keep a copy of the schema in RAM; if it is unchanged, do not submit this query
 
-    // let transaction = client.transaction().await?;
-    // for query in schema_query {
-    //     transaction.query(&query.get(), &[]).await?;
-    // }
-    // transaction.commit().await?;
-
+    let transaction = client.transaction().await?;
     for query in schema_query {
-        let _insert = client.query(&query.get(), &[]).await?;
-        info!(table_name = &table_name);
+        transaction.query(&query.get(), &[]).await?;
     }
+    transaction.commit().await?;
 
     return Ok(());
 }
@@ -164,10 +156,12 @@ async fn create_table(client: &mut Client, publish: &rumqttc::v5::mqttbytes::v5:
 #[tracing::instrument(name = "insert_row", skip(client, publish))]
 async fn insert_row(client: &mut Client, publish: &rumqttc::v5::mqttbytes::v5::Publish, table_name: &String) -> anyhow::Result<()> {
     let insert_record = InsertRecord::new(table_name, &publish.payload).build()?;
+
+    let transaction = client.transaction().await?;
     for query in insert_record {
-        let _insert = client.query(&query.get(), &[]).await?;
-        info!(table_name = &table_name);
+        transaction.query(&query.get(), &[]).await?;
     }
+    transaction.commit().await?;
 
     return Ok(());
 }
