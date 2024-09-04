@@ -17,4 +17,4 @@ datasources:
       maxIdleConns: 100
       maxIdleConnsAuto: true
       connMaxLifetime: 14400
-      timescaledb: false
+      timescaledb: true

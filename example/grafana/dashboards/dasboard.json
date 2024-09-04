@@ -111,7 +111,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT timestamp, power FROM zigbee2mqtt_serverrack_schalter WHERE $__timeFilter(\"timestamp\")",
+          "rawSql": "SELECT time, power FROM zigbee2mqtt_serverrack_schalter WHERE $__timeFilter(\"time\")",
           "refId": "A",
           "sql": {
             "columns": [
@@ -232,7 +232,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT wifi_signal, \"timestamp\" FROM awtrix_eceb30_stats WHERE $__timeFilter(\"timestamp\")",
+          "rawSql": "SELECT time_bucket('1m',time) as time, avg(wifi_signal) FROM awtrix_eceb30_stats WHERE $__timeFilter(time) GROUP BY 1",
           "refId": "A",
           "sql": {
             "columns": [
@@ -248,7 +248,7 @@
               {
                 "parameters": [
                   {
-                    "name": "\"timestamp\"",
+                    "name": "\"time\"",
                     "type": "functionParameter"
                   }
                 ],
