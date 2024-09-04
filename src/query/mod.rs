@@ -5,7 +5,7 @@ pub mod pg_datatype;
 use crate::Error;
 
 pub trait Query {
-    fn build(&self) -> Result<ValidQuery, Error>;
+    fn build(&self) -> Result<Vec<ValidQuery>, Error>;
 
     fn get_type(&self) -> QueryType;
 }

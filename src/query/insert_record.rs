@@ -30,7 +30,7 @@ impl<'a> InsertRecord<'a> {
 }
 
 impl<'a> Query for InsertRecord<'a> {
-    fn build(&self) -> Result<ValidQuery, Error> {
+    fn build(&self) -> Result<Vec<ValidQuery>, Error> {
         if self.payload.is_json() {
             let entries: HashMap<String, Value> = serde_json::from_slice(self.payload)
                 .map_err(|err| Error::JSONError {
@@ -52,21 +52,21 @@ impl<'a> Query for InsertRecord<'a> {
                 }
             }
 
-            return Ok(format!(
+            return Ok(vec![format!(
                 "INSERT INTO {} ({}) VALUES ({});",
                 self.table_name,
                 keys.join(", "),
                 values.join(", ")
             )
-            .into());
+            .into()]);
         } else {
-            return Ok(format!(
+            return Ok(vec![format!(
                 "INSERT INTO {} ({}) VALUES ('{}');",
                 self.table_name,
                 self.table_name,
                 self.payload.escape_ascii().to_string()
             )
-            .into());
+            .into()]);
         }
     }
 

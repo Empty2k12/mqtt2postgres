@@ -100,7 +100,7 @@ async fn main() -> anyhow::Result<()> {
 
 #[tracing::instrument(name = "handle_publish", skip(client, publish))]
 async fn handle_publish(
-    client: &Client,
+    client: &mut Client,
     publish: &rumqttc::v5::mqttbytes::v5::Publish
 ) -> anyhow::Result<()> {
     let topic = slugify_topic(&publish.topic);
@@ -119,18 +119,27 @@ async fn handle_publish(
 
         match schema_query {
             Ok(schema_query) => {
-                // TODO: keep a copy of them schema in RAM; if it is unchanged, do not submit this query
-                let _table = client.query(&schema_query.get(), &[]).await?;
+                // TODO: keep a copy of the schema in RAM; if it is unchanged, do not submit this query
+                // let _table = client.query(&schema_query.get(), &[]).await?;
+
+                let transaction = client.transaction().await?;
+                for query in schema_query {
+                    transaction.query(&query.get(), &[]).await?;
+                }
+                transaction.commit().await?;
 
                 if let Ok(insert_record) =
                     InsertRecord::new(&table_name, &publish.payload).build()
                 {
-                    let query = &insert_record.get();
-                    let insert_record2 = client.query(query, &[]).await;
-
-                    if insert_record2.is_err() {
-                        println!("{:?}", query);
+                    let transaction = client.transaction().await?;
+                    for query in insert_record {
+                        transaction.query(&query.get(), &[]).await?;
                     }
+                    transaction.commit().await?;
+
+                    // if insert_record2.is_err() {
+                    //     println!("{:?}", query);
+                    // }
 
                     info!(table_name = &table_name);
                 }
