@@ -9,15 +9,20 @@ use anyhow::Context;
 pub use config::Config;
 pub use error::Error;
 pub use helpers::IsJson;
-use query::insert_record::InsertRecord;
 pub use query::{create_table::CreateTable, Query, QueryType, ValidQuery};
+use query::{insert_record::InsertRecord, pg_datatype::PGDatatype};
 
 use rumqttc::v5::mqttbytes::QoS;
 
 use slugify::slugify;
 
 use rumqttc::v5::{AsyncClient, MqttOptions};
-use std::{fs, time::Duration};
+use std::{
+    collections::HashMap,
+    fs,
+    sync::{Mutex, MutexGuard, OnceLock},
+    time::Duration
+};
 
 use rumqttc::v5::{mqttbytes::v5::Packet, Event};
 
@@ -27,6 +32,17 @@ use tokio_postgres::{Client, NoTls};
 
 use tracing::info;
 use tracing_subscriber;
+
+pub type KeyValueType = (String, PGDatatype);
+pub type KnownTableSchema = Vec<KeyValueType>;
+pub type KnownTableSchemata = HashMap<String, KnownTableSchema>;
+
+pub fn get_global_hashmap() -> MutexGuard<'static, KnownTableSchemata> {
+    static MAP: OnceLock<Mutex<KnownTableSchemata>> = OnceLock::new();
+    MAP.get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .expect("Let's hope the lock isn't poisoned")
+}
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
@@ -72,7 +88,7 @@ async fn main() -> anyhow::Result<()> {
             .unwrap();
     }
 
-    let (client, connection) =
+    let (mut client, connection) =
         tokio_postgres::connect(&config.postgres.connection_string, NoTls).await?;
 
     tokio::spawn(async move {
@@ -86,7 +102,7 @@ async fn main() -> anyhow::Result<()> {
         match &event {
             Ok(v) => match v {
                 Event::Incoming(Packet::Publish(publish)) => {
-                    handle_publish(&client, publish).await?
+                    handle_publish(&mut client, publish).await?
                 },
                 _ => {}
             },

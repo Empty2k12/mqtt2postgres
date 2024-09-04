@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use bytes::Bytes;
 use serde_json::Value;
 
-use crate::{Error, IsJson, Query, QueryType, ValidQuery};
+use crate::{get_global_hashmap, Error, IsJson, Query, QueryType, ValidQuery};
 
 use super::pg_datatype::PGDatatype;
 
@@ -29,6 +29,11 @@ impl<'a> InsertRecord<'a> {
     }
 }
 
+fn do_vecs_match<T: PartialEq>(a: &Vec<T>, b: &Vec<T>) -> bool {
+    let matching = a.iter().zip(b.iter()).filter(|&(a, b)| a == b).count();
+    matching == a.len() && matching == b.len()
+}
+
 impl<'a> Query for InsertRecord<'a> {
     fn build(&self) -> Result<Vec<ValidQuery>, Error> {
         if self.payload.is_json() {
@@ -39,17 +44,36 @@ impl<'a> Query for InsertRecord<'a> {
 
             let mut keys = Vec::new();
             let mut values = Vec::new();
+            let mut types = Vec::new();
 
             for (key, value) in entries {
                 if let Ok(datatype) = PGDatatype::try_from(&value) {
                     if datatype == PGDatatype::Text {
                         values.push(format!(r#"'{}'"#, value.as_str().unwrap()));
                         keys.push(key);
+                        types.push(datatype);
                     } else if datatype != PGDatatype::Null {
                         values.push(value.to_string());
                         keys.push(key);
+                        types.push(datatype);
                     }
                 }
+            }
+
+            let new_schema = keys.iter().cloned().zip(types.into_iter()).collect();
+            if let Some((_table_name, previous_schema)) =
+                get_global_hashmap().get_key_value(&self.table_name)
+            {
+                if do_vecs_match(previous_schema, &new_schema) {
+                    println!("Type matches previous type");
+                } else {
+                    get_global_hashmap()
+                        .get_mut(&self.table_name)
+                        .map(move |val| *val = new_schema.to_vec());
+                    println!("Updated type!!");
+                }
+            } else {
+                get_global_hashmap().insert(self.table_name.clone(), new_schema.to_vec());
             }
 
             return Ok(vec![format!(

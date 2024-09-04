@@ -1,6 +1,6 @@
 use serde_json::Value::{Bool, Number};
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum PGDatatype {
     Numeric,
     Boolean,
