@@ -12,19 +12,21 @@ use super::pg_datatype::PGDatatype;
 #[derive(Debug, Clone)]
 pub struct CreateTable<'a> {
     table_name: String,
-    payload: &'a Bytes
+    payload: &'a Bytes,
+    init_hypertable: bool
 }
 
 impl<'a> CreateTable<'a> {
     /// Creates a new [`ReadQuery`]
     #[must_use = "Creating a query is pointless unless you execute it"]
-    pub fn new<S1>(table_name: S1, payload: &'a Bytes) -> Self
+    pub fn new<S1>(table_name: S1, payload: &'a Bytes, init_hypertable: bool) -> Self
     where
         S1: Into<String>
     {
         CreateTable {
             table_name: table_name.into(),
-            payload
+            payload,
+            init_hypertable
         }
     }
 }
@@ -34,7 +36,7 @@ impl<'a> Query for CreateTable<'a> {
         &self,
         _known_schemata: &mut KnownTableSchemata
     ) -> Result<Vec<ValidQuery>, Error> {
-        // let hypertable_query: ValidQuery = format!("SELECT create_hypertable('{}', by_range('time'), migrate_data => true);", self.table_name).into();
+        let mut queries = vec![];
         if self.payload.is_json() {
             let entries: HashMap<String, Value> = serde_json::from_slice(self.payload)
                 .map_err(|err| Error::JSONError {
@@ -49,12 +51,22 @@ impl<'a> Query for CreateTable<'a> {
                 }
             }
 
-
-
-            return Ok(vec![format!("CREATE TABLE IF NOT EXISTS {} (time TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, {});", self.table_name, fields.join(", ")).into() /*, hypertable_query*/]);
+            queries.push(format!("CREATE TABLE IF NOT EXISTS {} (time TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, {});", self.table_name, fields.join(", ")).into());
         } else {
-            return Ok(vec![format!("CREATE TABLE IF NOT EXISTS {} (time TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, {} text);", self.table_name, self.table_name).into() /*, hypertable_query*/]);
+            // TODO: use actual type here instead of 'text'
+            queries.push(format!("CREATE TABLE IF NOT EXISTS {} (time TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, {} text);", self.table_name, self.table_name).into());
         }
+
+        if self.init_hypertable {
+            let hypertable_query: ValidQuery = format!(
+                "SELECT create_hypertable('{}', by_range('time'), migrate_data => true);",
+                self.table_name
+            )
+            .into();
+            queries.push(hypertable_query);
+        }
+
+        return Ok(queries);
     }
 
     fn get_type(&self) -> QueryType {

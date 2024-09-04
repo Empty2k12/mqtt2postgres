@@ -96,7 +96,13 @@ async fn main() -> anyhow::Result<()> {
         match &event {
             Ok(v) => match v {
                 Event::Incoming(Packet::Publish(publish)) => {
-                    handle_publish(&mut client, publish, &mut known_schemata).await?
+                    handle_publish(
+                        &mut client,
+                        publish,
+                        &mut known_schemata,
+                        config.postgres.timescale
+                    )
+                    .await?
                 },
                 _ => {}
             },
@@ -112,7 +118,8 @@ async fn main() -> anyhow::Result<()> {
 async fn handle_publish(
     client: &mut Client,
     publish: &rumqttc::v5::mqttbytes::v5::Publish,
-    known_schemata: &mut KnownTableSchemata
+    known_schemata: &mut KnownTableSchemata,
+    timescale_enabled: bool
 ) -> anyhow::Result<()> {
     let topic = slugify_topic(&publish.topic);
 
@@ -126,7 +133,14 @@ async fn handle_publish(
     {
         let table_name = topic.join("_"); // FIXME: turn back to . and make use of postgres schemata
 
-        create_table(client, publish, &table_name, known_schemata).await?;
+        create_table(
+            client,
+            publish,
+            &table_name,
+            known_schemata,
+            timescale_enabled
+        )
+        .await?;
         insert_row(client, publish, &table_name, known_schemata).await?;
     }
 
@@ -138,10 +152,13 @@ async fn create_table(
     client: &mut Client,
     publish: &rumqttc::v5::mqttbytes::v5::Publish,
     table_name: &String,
-    known_schemata: &mut KnownTableSchemata
+    known_schemata: &mut KnownTableSchemata,
+    timescale_enabled: bool
 ) -> anyhow::Result<()> {
-    let schema_query =
-        CreateTable::new(table_name, &publish.payload).build(known_schemata)?;
+    let create_hypertable = timescale_enabled && client.query(&format!("SELECT * FROM timescaledb_information.hypertables WHERE hypertable_name = '{}';", table_name), &[]).await?.len() == 0;
+
+    let schema_query = CreateTable::new(table_name, &publish.payload, create_hypertable)
+        .build(known_schemata)?;
 
     // TODO: keep a copy of the schema in RAM; if it is unchanged, do not submit this query
 
