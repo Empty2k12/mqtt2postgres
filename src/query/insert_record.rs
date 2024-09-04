@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use bytes::Bytes;
 use serde_json::Value;
+use tracing::{debug, info};
 
 use crate::{get_global_hashmap, Error, IsJson, Query, QueryType, ValidQuery};
 
@@ -65,16 +66,18 @@ impl<'a> Query for InsertRecord<'a> {
                 get_global_hashmap().get_key_value(&self.table_name)
             {
                 if do_vecs_match(previous_schema, &new_schema) {
-                    println!("Type matches previous type");
+                    info!("Type matches previous type");
                 } else {
                     get_global_hashmap()
                         .get_mut(&self.table_name)
                         .map(move |val| *val = new_schema.to_vec());
-                    println!("Updated type!!");
+                    info!("Updated type!!");
                 }
             } else {
                 get_global_hashmap().insert(self.table_name.clone(), new_schema.to_vec());
             }
+
+            info!("{:?}", get_global_hashmap());
 
             return Ok(vec![format!(
                 "INSERT INTO {} ({}) VALUES ({});",

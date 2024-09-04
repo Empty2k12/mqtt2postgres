@@ -31,7 +31,7 @@ impl<'a> CreateTable<'a> {
 
 impl<'a> Query for CreateTable<'a> {
     fn build(&self) -> Result<Vec<ValidQuery>, Error> {
-        let hypertable_query: ValidQuery = format!("SELECT create_hypertable('{}', by_range('timestamp'), migrate_data => true);", self.table_name).into();
+        // let hypertable_query: ValidQuery = format!("SELECT create_hypertable('{}', by_range('timestamp'), migrate_data => true);", self.table_name).into();
         if self.payload.is_json() {
             let entries: HashMap<String, Value> = serde_json::from_slice(&self.payload)
                 .map_err(|err| Error::JSONError {
@@ -46,9 +46,9 @@ impl<'a> Query for CreateTable<'a> {
                 }
             }
 
-            return Ok(vec![format!("CREATE TABLE IF NOT EXISTS {} (timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, {});", self.table_name, fields.join(", ")).into(), hypertable_query]);
+            return Ok(vec![format!("CREATE TABLE IF NOT EXISTS {} (timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, {});", self.table_name, fields.join(", ")).into() /*, hypertable_query*/]);
         } else {
-            return Ok(vec![format!("CREATE TABLE IF NOT EXISTS {} (timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, {} text);", self.table_name, self.table_name).into(), hypertable_query]);
+            return Ok(vec![format!("CREATE TABLE IF NOT EXISTS {} (timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, {} text);", self.table_name, self.table_name).into() /*, hypertable_query*/]);
         }
     }
 

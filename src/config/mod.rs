@@ -63,6 +63,7 @@ pub struct PostgresConfig {
 #[serde(deny_unknown_fields)]
 pub struct TopicsConfig {
     pub subscribe: Vec<TopicSubscribe>,
+    #[serde(default = "Default::default")]
     pub ignore: Vec<TopicIgnore>
 }
 

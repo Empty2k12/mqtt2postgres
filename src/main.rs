@@ -30,7 +30,7 @@ use bytes::Bytes;
 
 use tokio_postgres::{Client, NoTls};
 
-use tracing::info;
+use tracing::{debug, info};
 use tracing_subscriber;
 
 pub type KeyValueType = (String, PGDatatype);
@@ -121,6 +121,9 @@ async fn handle_publish(
 ) -> anyhow::Result<()> {
     let topic = slugify_topic(&publish.topic);
 
+    let payload_str = publish.payload.escape_ascii().to_string();
+    debug!(topic = topic.join("-"));
+
     if topic.len() >= 2
         // TODO: use config provided ignores
         && topic[1] != "bridge"
@@ -131,40 +134,42 @@ async fn handle_publish(
     {
         let table_name = topic.join("_"); // FIXME: turn back to . and make use of postgres schemata
 
-        let schema_query = CreateTable::new(&table_name, &publish.payload).build();
-
-        match schema_query {
-            Ok(schema_query) => {
-                // TODO: keep a copy of the schema in RAM; if it is unchanged, do not submit this query
-                // let _table = client.query(&schema_query.get(), &[]).await?;
-
-                let transaction = client.transaction().await?;
-                for query in schema_query {
-                    transaction.query(&query.get(), &[]).await?;
-                }
-                transaction.commit().await?;
-
-                if let Ok(insert_record) =
-                    InsertRecord::new(&table_name, &publish.payload).build()
-                {
-                    let transaction = client.transaction().await?;
-                    for query in insert_record {
-                        transaction.query(&query.get(), &[]).await?;
-                    }
-                    transaction.commit().await?;
-
-                    // if insert_record2.is_err() {
-                    //     println!("{:?}", query);
-                    // }
-
-                    info!(table_name = &table_name);
-                }
-            },
-            Err(_) => {}
-        }
+        let _table = create_table(client, publish, &table_name).await?;
+        let _insert = insert_row(client, publish, &table_name).await?;
     }
 
     Ok(())
+}
+
+#[tracing::instrument(name = "create_table", skip(client, publish))]
+async fn create_table(client: &mut Client, publish: &rumqttc::v5::mqttbytes::v5::Publish, table_name: &String) -> anyhow::Result<()> {
+    let schema_query = CreateTable::new(table_name, &publish.payload).build()?;
+
+    // TODO: keep a copy of the schema in RAM; if it is unchanged, do not submit this query
+
+    // let transaction = client.transaction().await?;
+    // for query in schema_query {
+    //     transaction.query(&query.get(), &[]).await?;
+    // }
+    // transaction.commit().await?;
+
+    for query in schema_query {
+        let _insert = client.query(&query.get(), &[]).await?;
+        info!(table_name = &table_name);
+    }
+
+    return Ok(());
+}
+
+#[tracing::instrument(name = "insert_row", skip(client, publish))]
+async fn insert_row(client: &mut Client, publish: &rumqttc::v5::mqttbytes::v5::Publish, table_name: &String) -> anyhow::Result<()> {
+    let insert_record = InsertRecord::new(table_name, &publish.payload).build()?;
+    for query in insert_record {
+        let _insert = client.query(&query.get(), &[]).await?;
+        info!(table_name = &table_name);
+    }
+
+    return Ok(());
 }
 
 fn slugify_topic(topic: &Bytes) -> Vec<String> {
