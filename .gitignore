@@ -1,2 +1,5 @@
 /target
 config.toml
+
+example/grafana/provisioning/dashboards/
+!example/grafana/provisioning/dashboards/dashboard.yml
