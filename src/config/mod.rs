@@ -19,7 +19,7 @@ pub struct MqttConfig {
     pub keep_alive_seconds: KeepAliveSeconds,
 
     #[serde(default)]
-    pub max_packet_size: MaxPacketSize,
+    pub max_packet_size: MaxPacketSize
 }
 
 /// Keep alive in seconds.
@@ -32,7 +32,7 @@ impl Default for KeepAliveSeconds {
 }
 impl Into<u64> for KeepAliveSeconds {
     fn into(self) -> u64 {
-        return self.0
+        return self.0;
     }
 }
 
@@ -46,14 +46,17 @@ impl Default for MaxPacketSize {
 }
 impl Into<u32> for MaxPacketSize {
     fn into(self) -> u32 {
-        return self.0
+        return self.0;
     }
 }
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PostgresConfig {
-    pub connection_string: String
+    pub connection_string: String,
+
+    #[serde(default = "default_as_false")]
+    pub timescale: bool
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -73,4 +76,8 @@ pub struct TopicSubscribe {
 #[serde(deny_unknown_fields)]
 pub struct TopicIgnore {
     pub topic: String
+}
+
+fn default_as_false() -> bool {
+    false
 }

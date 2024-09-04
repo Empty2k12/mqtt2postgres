@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16.2-alpine
+    image: timescale/timescaledb:2.16.1-pg16
     restart: always
     container_name: postgres
     environment:

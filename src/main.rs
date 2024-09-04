@@ -49,10 +49,20 @@ async fn main() -> anyhow::Result<()> {
         &config.mqtt.broker_ip,
         config.mqtt.broker_port
     );
-    mqttoptions.set_keep_alive(Duration::from_secs(config.mqtt.keep_alive_seconds.into()));
+    mqttoptions
+        .set_keep_alive(Duration::from_secs(config.mqtt.keep_alive_seconds.into()));
     mqttoptions.set_max_packet_size(Some(config.mqtt.max_packet_size.into()));
 
-    info!(broker_ip = &config.mqtt.broker_ip, broker_port = config.mqtt.broker_port, client_name = &config.mqtt.client_name, "Connecting to MQTT");
+    info!(
+        broker_ip = &config.mqtt.broker_ip,
+        broker_port = config.mqtt.broker_port,
+        client_name = &config.mqtt.client_name,
+        "Connecting to MQTT"
+    );
+
+    if config.postgres.timescale {
+        info!("Timescale Integration is enabled!");
+    }
 
     let (mqtt_client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
     for subscribe in config.topics.subscribe {
@@ -62,11 +72,8 @@ async fn main() -> anyhow::Result<()> {
             .unwrap();
     }
 
-    let (client, connection) = tokio_postgres::connect(
-        &config.postgres.connection_string,
-        NoTls
-    )
-    .await?;
+    let (client, connection) =
+        tokio_postgres::connect(&config.postgres.connection_string, NoTls).await?;
 
     tokio::spawn(async move {
         if let Err(e) = connection.await {
@@ -99,6 +106,7 @@ async fn handle_publish(
     let topic = slugify_topic(&publish.topic);
 
     if topic.len() >= 2
+        // TODO: use config provided ignores
         && topic[1] != "bridge"
         && topic[0] != "homeassistant"
         && !publish.dup

@@ -1,5 +1,5 @@
 [mqtt]
-broker_ip = "134.130.172.253"
+broker_ip = "127.0.0.1"
 broker_port = 1883
 client_name = "mqtt2postgres"
 # optional
@@ -9,15 +9,14 @@ max_packet_size = 10000
 
 [postgres]
 connection_string = "postgresql://postgres:postgres@localhost:5432/mqtt2postgres"
+# optional - enable when using Timescale postgres extension
+timescale = true
 
 [[topics.subscribe]]
 topic = "#"
 
 # [[topics.subscribe]]
 # topic = "zigbee2mqtt/#"
-
-# [[topics.subscribe]]
-# topic = "awtrix/eceb30/#"
 
 [[topics.ignore]]
 topic = "homeassistant/#"
