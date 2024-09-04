@@ -48,11 +48,11 @@ impl<'a> Query for InsertRecord<'a> {
                 if let Ok(datatype) = PGDatatype::try_from(&value) {
                     if datatype == PGDatatype::Text {
                         values.push(format!(r#"'{}'"#, value.as_str().unwrap()));
-                        keys.push(key);
+                        keys.push(key.to_lowercase());
                         types.push(datatype);
                     } else if datatype != PGDatatype::Null {
                         values.push(value.to_string());
-                        keys.push(key);
+                        keys.push(key.to_lowercase());
                         types.push(datatype);
                     }
                 }
@@ -68,7 +68,7 @@ impl<'a> Query for InsertRecord<'a> {
 
                 if difference.next().is_some() {
                     // TODO: alter table add field
-                    panic!("alter table");
+                    panic!("alter table: {:?} - {:?} - {:?}", previous_schema, new_schema, difference);
                 }
             } else {
                 known_schemata.insert(self.table_name.clone(), new_schema);
