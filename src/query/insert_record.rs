@@ -4,7 +4,6 @@ use std::collections::{HashMap, HashSet};
 
 use bytes::Bytes;
 use serde_json::Value;
-use tracing::info;
 
 use crate::{Error, IsJson, KnownTableSchemata, Query, QueryType, ValidQuery};
 
@@ -65,14 +64,11 @@ impl<'a> Query for InsertRecord<'a> {
             if let Some((_, previous_schema)) =
                 known_schemata.get_key_value(&self.table_name)
             {
-                let a = previous_schema;
-                let b = new_schema;
-
-                let mut difference = a.symmetric_difference(&b);
+                let mut difference = new_schema.difference(previous_schema);
 
                 if difference.next().is_some() {
-                    info!("New field {:?}", difference);
                     // TODO: alter table add field
+                    panic!("alter table");
                 }
             } else {
                 known_schemata.insert(self.table_name.clone(), new_schema);

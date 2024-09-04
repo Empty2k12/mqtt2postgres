@@ -133,14 +133,40 @@ async fn handle_publish(
     {
         let table_name = topic.join("_"); // FIXME: turn back to . and make use of postgres schemata
 
-        create_table(
-            client,
-            publish,
-            &table_name,
-            known_schemata,
-            timescale_enabled
-        )
-        .await?;
+        // Check if we have NOT enountered this schema at run-time
+        if known_schemata.get(&table_name).is_none() {
+            // Request column_name and data_type for the specified table from Postgres. This will be empty, when the tables does not exist.
+            let rows = client.query(&format!("SELECT column_name, data_type FROM information_schema.columns where table_name = '{}' AND column_name != 'time';", table_name), &[]).await?;
+
+            // We have never seen this table
+            if rows.is_empty() {
+                create_table(
+                    client,
+                    publish,
+                    &table_name,
+                    known_schemata,
+                    timescale_enabled
+                )
+                .await?;
+            } else {
+                // Update our known schemata with the schema from Postgres and then run the table creation logic
+                let mut new_schema = HashSet::new();
+                for row in rows {
+                    let value_name: String = row.get("column_name");
+                    let data_type: PGDatatype = row.get("data_type");
+                    new_schema.insert((value_name, data_type));
+                }
+                known_schemata.insert(table_name.clone(), new_schema);
+                create_table(
+                    client,
+                    publish,
+                    &table_name,
+                    known_schemata,
+                    timescale_enabled
+                )
+                .await?;
+            }
+        }
         insert_row(client, publish, &table_name, known_schemata).await?;
     }
 
@@ -155,7 +181,7 @@ async fn create_table(
     known_schemata: &mut KnownTableSchemata,
     timescale_enabled: bool
 ) -> anyhow::Result<()> {
-    let create_hypertable = timescale_enabled && client.query(&format!("SELECT * FROM timescaledb_information.hypertables WHERE hypertable_name = '{}';", table_name), &[]).await?.len() == 0;
+    let create_hypertable = timescale_enabled && client.query(&format!("SELECT * FROM timescaledb_information.hypertables WHERE hypertable_name = '{}';", table_name), &[]).await?.is_empty();
 
     let schema_query = CreateTable::new(table_name, &publish.payload, create_hypertable)
         .build(known_schemata)?;
