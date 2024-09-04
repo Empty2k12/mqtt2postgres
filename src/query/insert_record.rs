@@ -1,16 +1,16 @@
 //! Table Insertion Query Builder
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use bytes::Bytes;
 use serde_json::Value;
-use tracing::{info};
+use tracing::info;
 
-use crate::{get_global_hashmap, Error, IsJson, Query, QueryType, ValidQuery};
+use crate::{Error, IsJson, KnownTableSchemata, Query, QueryType, ValidQuery};
 
 use super::pg_datatype::PGDatatype;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct InsertRecord<'a> {
     table_name: String,
     payload: &'a Bytes
@@ -30,13 +30,11 @@ impl<'a> InsertRecord<'a> {
     }
 }
 
-fn do_vecs_match<T: PartialEq>(a: &Vec<T>, b: &Vec<T>) -> bool {
-    let matching = a.iter().zip(b.iter()).filter(|&(a, b)| a == b).count();
-    matching == a.len() && matching == b.len()
-}
-
 impl<'a> Query for InsertRecord<'a> {
-    fn build(&self) -> Result<Vec<ValidQuery>, Error> {
+    fn build(
+        &self,
+        known_schemata: &mut KnownTableSchemata
+    ) -> Result<Vec<ValidQuery>, Error> {
         if self.payload.is_json() {
             let entries: HashMap<String, Value> = serde_json::from_slice(self.payload)
                 .map_err(|err| Error::JSONError {
@@ -61,23 +59,24 @@ impl<'a> Query for InsertRecord<'a> {
                 }
             }
 
-            // let new_schema = keys.iter().cloned().zip(types.into_iter()).collect();
-            // if let Some((_table_name, previous_schema)) =
-            //     get_global_hashmap().get_key_value(&self.table_name)
-            // {
-            //     if do_vecs_match(previous_schema, &new_schema) {
-            //         info!("Type matches previous type");
-            //     } else {
-            //         get_global_hashmap()
-            //             .get_mut(&self.table_name)
-            //             .map(move |val| *val = new_schema.to_vec());
-            //         info!("Updated type!!");
-            //     }
-            // } else {
-            //     get_global_hashmap().insert(self.table_name.clone(), new_schema.to_vec());
-            // }
+            let new_schema: HashSet<(String, PGDatatype)> =
+                keys.iter().cloned().zip(types).collect();
 
-            info!("{:?}", get_global_hashmap());
+            if let Some((_, previous_schema)) =
+                known_schemata.get_key_value(&self.table_name)
+            {
+                let a = previous_schema;
+                let b = new_schema;
+
+                let mut difference = a.symmetric_difference(&b);
+
+                if difference.next().is_some() {
+                    info!("New field {:?}", difference);
+                    // TODO: alter table add field
+                }
+            } else {
+                known_schemata.insert(self.table_name.clone(), new_schema);
+            }
 
             return Ok(vec![format!(
                 "INSERT INTO {} ({}) VALUES ({});",
@@ -91,7 +90,7 @@ impl<'a> Query for InsertRecord<'a> {
                 "INSERT INTO {} ({}) VALUES ('{}');",
                 self.table_name,
                 self.table_name,
-                self.payload.escape_ascii().to_string()
+                self.payload.escape_ascii()
             )
             .into()]);
         }

@@ -1,4 +1,5 @@
 #![feature(ascii_char)]
+#![allow(clippy::needless_return, clippy::single_match)]
 
 mod config;
 mod error;
@@ -18,9 +19,8 @@ use slugify::slugify;
 
 use rumqttc::v5::{AsyncClient, MqttOptions};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
-    sync::{Mutex, MutexGuard, OnceLock},
     time::Duration
 };
 
@@ -30,19 +30,11 @@ use bytes::Bytes;
 
 use tokio_postgres::{Client, NoTls};
 
-use tracing::{debug, info};
-use tracing_subscriber;
+use tracing::info;
 
 pub type KeyValueType = (String, PGDatatype);
-pub type KnownTableSchema = Vec<KeyValueType>;
+pub type KnownTableSchema = HashSet<(String, PGDatatype)>;
 pub type KnownTableSchemata = HashMap<String, KnownTableSchema>;
-
-pub fn get_global_hashmap() -> MutexGuard<'static, KnownTableSchemata> {
-    static MAP: OnceLock<Mutex<KnownTableSchemata>> = OnceLock::new();
-    MAP.get_or_init(|| Mutex::new(HashMap::new()))
-        .lock()
-        .expect("Let's hope the lock isn't poisoned")
-}
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
@@ -97,12 +89,14 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    let mut known_schemata: KnownTableSchemata = HashMap::new();
+
     loop {
         let event = eventloop.poll().await;
         match &event {
             Ok(v) => match v {
                 Event::Incoming(Packet::Publish(publish)) => {
-                    handle_publish(&mut client, publish).await?
+                    handle_publish(&mut client, publish, &mut known_schemata).await?
                 },
                 _ => {}
             },
@@ -114,10 +108,11 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-#[tracing::instrument(name = "handle_publish", skip(client, publish))]
+#[tracing::instrument(name = "handle_publish", skip(client, publish, known_schemata))]
 async fn handle_publish(
     client: &mut Client,
-    publish: &rumqttc::v5::mqttbytes::v5::Publish
+    publish: &rumqttc::v5::mqttbytes::v5::Publish,
+    known_schemata: &mut KnownTableSchemata
 ) -> anyhow::Result<()> {
     let topic = slugify_topic(&publish.topic);
 
@@ -131,16 +126,22 @@ async fn handle_publish(
     {
         let table_name = topic.join("_"); // FIXME: turn back to . and make use of postgres schemata
 
-        let _table = create_table(client, publish, &table_name).await?;
-        let _insert = insert_row(client, publish, &table_name).await?;
+        create_table(client, publish, &table_name, known_schemata).await?;
+        insert_row(client, publish, &table_name, known_schemata).await?;
     }
 
     Ok(())
 }
 
-#[tracing::instrument(name = "create_table", skip(client, publish))]
-async fn create_table(client: &mut Client, publish: &rumqttc::v5::mqttbytes::v5::Publish, table_name: &String) -> anyhow::Result<()> {
-    let schema_query = CreateTable::new(table_name, &publish.payload).build()?;
+#[tracing::instrument(name = "create_table", skip(client, publish, known_schemata))]
+async fn create_table(
+    client: &mut Client,
+    publish: &rumqttc::v5::mqttbytes::v5::Publish,
+    table_name: &String,
+    known_schemata: &mut KnownTableSchemata
+) -> anyhow::Result<()> {
+    let schema_query =
+        CreateTable::new(table_name, &publish.payload).build(known_schemata)?;
 
     // TODO: keep a copy of the schema in RAM; if it is unchanged, do not submit this query
 
@@ -153,9 +154,15 @@ async fn create_table(client: &mut Client, publish: &rumqttc::v5::mqttbytes::v5:
     return Ok(());
 }
 
-#[tracing::instrument(name = "insert_row", skip(client, publish))]
-async fn insert_row(client: &mut Client, publish: &rumqttc::v5::mqttbytes::v5::Publish, table_name: &String) -> anyhow::Result<()> {
-    let insert_record = InsertRecord::new(table_name, &publish.payload).build()?;
+#[tracing::instrument(name = "insert_row", skip(client, publish, known_schemata))]
+async fn insert_row(
+    client: &mut Client,
+    publish: &rumqttc::v5::mqttbytes::v5::Publish,
+    table_name: &String,
+    known_schemata: &mut KnownTableSchemata
+) -> anyhow::Result<()> {
+    let insert_record =
+        InsertRecord::new(table_name, &publish.payload).build(known_schemata)?;
 
     let transaction = client.transaction().await?;
     for query in insert_record {

@@ -2,10 +2,13 @@ pub mod create_table;
 pub mod insert_record;
 pub mod pg_datatype;
 
-use crate::Error;
+use crate::{Error, KnownTableSchemata};
 
 pub trait Query {
-    fn build(&self) -> Result<Vec<ValidQuery>, Error>;
+    fn build(
+        &self,
+        known_schemata: &mut KnownTableSchemata
+    ) -> Result<Vec<ValidQuery>, Error>;
 
     fn get_type(&self) -> QueryType;
 }

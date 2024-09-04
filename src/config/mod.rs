@@ -30,9 +30,9 @@ impl Default for KeepAliveSeconds {
         KeepAliveSeconds(5)
     }
 }
-impl Into<u64> for KeepAliveSeconds {
-    fn into(self) -> u64 {
-        return self.0;
+impl From<KeepAliveSeconds> for u64 {
+    fn from(val: KeepAliveSeconds) -> Self {
+        return val.0;
     }
 }
 
@@ -44,9 +44,9 @@ impl Default for MaxPacketSize {
         MaxPacketSize(100000)
     }
 }
-impl Into<u32> for MaxPacketSize {
-    fn into(self) -> u32 {
-        return self.0;
+impl From<MaxPacketSize> for u32 {
+    fn from(val: MaxPacketSize) -> Self {
+        return val.0;
     }
 }
 

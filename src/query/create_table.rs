@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use bytes::Bytes;
 use serde_json::Value;
 
-use crate::{Error, IsJson, Query, QueryType, ValidQuery};
+use crate::{Error, IsJson, KnownTableSchemata, Query, QueryType, ValidQuery};
 
 use super::pg_datatype::PGDatatype;
 
@@ -30,19 +30,22 @@ impl<'a> CreateTable<'a> {
 }
 
 impl<'a> Query for CreateTable<'a> {
-    fn build(&self) -> Result<Vec<ValidQuery>, Error> {
+    fn build(
+        &self,
+        _known_schemata: &mut KnownTableSchemata
+    ) -> Result<Vec<ValidQuery>, Error> {
         // let hypertable_query: ValidQuery = format!("SELECT create_hypertable('{}', by_range('timestamp'), migrate_data => true);", self.table_name).into();
         if self.payload.is_json() {
-            let entries: HashMap<String, Value> = serde_json::from_slice(&self.payload)
+            let entries: HashMap<String, Value> = serde_json::from_slice(self.payload)
                 .map_err(|err| Error::JSONError {
-                error: format!("{}", err)
-            })?;
+                    error: format!("{}", err)
+                })?;
 
             let mut fields = Vec::with_capacity(entries.len());
 
             for (keys, value) in entries {
                 if let Ok(datatype) = PGDatatype::try_from(&value) {
-                    fields.push(format!("{} {}", keys, datatype.to_string()));
+                    fields.push(format!("{} {}", keys, datatype));
                 }
             }
 
