@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use bytes::Bytes;
 use serde_json::Value;
+use tracing::info;
 
 use crate::{Error, IsJson, KnownTableSchemata, Query, QueryType, ValidQuery};
 
@@ -35,6 +36,8 @@ impl<'a> Query for InsertRecord<'a> {
         known_schemata: &mut KnownTableSchemata
     ) -> Result<Vec<ValidQuery>, Error> {
         if self.payload.is_json() {
+            let mut queries: Vec<ValidQuery> = vec![];
+
             let entries: HashMap<String, Value> = serde_json::from_slice(self.payload)
                 .map_err(|err| Error::JSONError {
                     error: format!("{}", err)
@@ -64,23 +67,29 @@ impl<'a> Query for InsertRecord<'a> {
             if let Some((_, previous_schema)) =
                 known_schemata.get_key_value(&self.table_name)
             {
-                let mut difference = new_schema.difference(previous_schema);
+                let difference = new_schema.difference(previous_schema);
 
-                if difference.next().is_some() {
-                    // TODO: alter table add field
-                    panic!("alter table: {:?} - {:?} - {:?}", previous_schema, new_schema, difference);
+                if difference.clone().count() > 0 {
+                    info!("Altering Table '{}', adding fields {:?}", self.table_name, difference);
+                    for diff in difference {
+                        let alter_query = format!("ALTER TABLE {} ADD {} {})", self.table_name, diff.0, diff.1.to_string()).into();
+                        queries.push(alter_query);
+                    }
                 }
+
             } else {
                 known_schemata.insert(self.table_name.clone(), new_schema);
             }
 
-            return Ok(vec![format!(
+            queries.push(format!(
                 "INSERT INTO {} ({}) VALUES ({});",
                 self.table_name,
                 keys.join(", "),
                 values.join(", ")
             )
-            .into()]);
+            .into());
+
+            return Ok(queries);
         } else {
             return Ok(vec![format!(
                 "INSERT INTO {} ({}) VALUES ('{}');",
