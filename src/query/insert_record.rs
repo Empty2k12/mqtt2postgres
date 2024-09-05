@@ -72,7 +72,7 @@ impl<'a> Query for InsertRecord<'a> {
                 if difference.clone().count() > 0 {
                     info!("Altering Table '{}', adding fields {:?}", self.table_name, difference);
                     for diff in difference {
-                        let alter_query = format!("ALTER TABLE {} ADD {} {})", self.table_name, diff.0, diff.1.to_string()).into();
+                        let alter_query = format!("ALTER TABLE {} ADD {} {}", self.table_name, diff.0, diff.1.to_string()).into();
                         queries.push(alter_query);
                     }
                 }
