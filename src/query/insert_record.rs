@@ -70,9 +70,18 @@ impl<'a> Query for InsertRecord<'a> {
                 let difference = new_schema.difference(previous_schema);
 
                 if difference.clone().count() > 0 {
-                    info!("Altering Table '{}', adding fields {:?}", self.table_name, difference);
+                    info!(
+                        "Altering Table '{}', adding fields {:?}",
+                        self.table_name, difference
+                    );
                     for diff in difference {
-                        let alter_query = format!("ALTER TABLE {} ADD {} {}", self.table_name, diff.0, diff.1.to_string()).into();
+                        let alter_query = format!(
+                            "ALTER TABLE {} ADD {} {}",
+                            self.table_name,
+                            diff.0,
+                            diff.1.to_string()
+                        )
+                        .into();
                         queries.push(alter_query);
                     }
 
@@ -83,13 +92,15 @@ impl<'a> Query for InsertRecord<'a> {
                 known_schemata.insert(self.table_name.clone(), new_schema);
             }
 
-            queries.push(format!(
-                "INSERT INTO {} ({}) VALUES ({});",
-                self.table_name,
-                keys.join(", "),
-                values.join(", ")
-            )
-            .into());
+            queries.push(
+                format!(
+                    "INSERT INTO {} ({}) VALUES ({});",
+                    self.table_name,
+                    keys.join(", "),
+                    values.join(", ")
+                )
+                .into()
+            );
 
             return Ok(queries);
         } else {

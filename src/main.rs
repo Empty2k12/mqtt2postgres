@@ -30,7 +30,7 @@ use bytes::Bytes;
 
 use tokio_postgres::{Client, NoTls};
 
-use tracing::info;
+use tracing::{error, info};
 
 pub type KeyValueType = (String, PGDatatype);
 pub type KnownTableSchema = HashSet<(String, PGDatatype)>;
@@ -198,7 +198,10 @@ async fn insert_row(
 
     let transaction = client.transaction().await?;
     for query in insert_record {
-        transaction.query(&query.get(), &[]).await?;
+        let res = transaction.query(&query.get(), &[]).await;
+        if let Err(err) = res {
+            error!("{:?}", err);
+        }
     }
     transaction.commit().await?;
 
