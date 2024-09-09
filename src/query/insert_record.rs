@@ -75,8 +75,10 @@ impl<'a> Query for InsertRecord<'a> {
                         let alter_query = format!("ALTER TABLE {} ADD {} {}", self.table_name, diff.0, diff.1.to_string()).into();
                         queries.push(alter_query);
                     }
-                }
 
+                    known_schemata.remove(&self.table_name);
+                    known_schemata.insert(self.table_name.clone(), new_schema);
+                }
             } else {
                 known_schemata.insert(self.table_name.clone(), new_schema);
             }
