@@ -1,0 +1,40 @@
+services:
+  mqtt2postgres:
+    build:
+      dockerfile: Dockerfile
+      context: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    container_name: mqtt2postgres
+    networks:
+      - grafanastack
+    volumes:
+      - ./config.toml:/config.toml
+    environment:
+      - RUST_LOG=mqtt2postgres=trace
+    restart: always
+  postgres:
+    image: timescale/timescaledb:2.16.1-pg16
+    restart: always
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=mqtt2postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mqtt2postgres"]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+    networks:
+      - grafanastack
+    volumes:
+      - pg_mqtt2postgres_data:/var/lib/postgresql/data
+
+networks:
+  grafanastack:
+    external: true
+
+volumes:
+  pg_mqtt2postgres_data:
