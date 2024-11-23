@@ -1,4 +1,3 @@
-#![feature(ascii_char)]
 #![allow(clippy::needless_return, clippy::single_match)]
 
 mod config;
